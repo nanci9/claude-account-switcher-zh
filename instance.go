@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"net"
 	"strings"
@@ -63,7 +64,7 @@ func hello(addr, v string) string {
 
 // serveInstance answers hellos on the lock and calls quit, once, when a newer
 // version says hello.
-func serveInstance(l net.Listener, quit func()) {
+func serveInstance(l net.Listener, quit func(), open ...func()) {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -71,6 +72,12 @@ func serveInstance(l net.Listener, quit func()) {
 		}
 		conn.SetDeadline(time.Now().Add(3 * time.Second))
 		line, _ := bufio.NewReader(conn).ReadString('\n')
+		if strings.TrimSpace(line) == "open-window" && len(open) > 0 && open[0] != nil {
+			conn.Write([]byte("opened\n"))
+			conn.Close()
+			go open[0]()
+			continue
+		}
 		v, ok := strings.CutPrefix(line, helloPrefix)
 		if ok && newerVersion(strings.TrimSpace(v), version) {
 			conn.Write([]byte("quit\n"))
@@ -82,4 +89,14 @@ func serveInstance(l net.Listener, quit func()) {
 		conn.Write([]byte("stay\n"))
 		conn.Close()
 	}
+}
+
+func requestAccountWindow() {
+	conn, err := net.DialTimeout("tcp", instancePort, 2*time.Second)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(3 * time.Second))
+	fmt.Fprintln(conn, "open-window")
 }

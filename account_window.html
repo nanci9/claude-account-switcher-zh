@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#17191e">
+  <title>Claude 账号管理</title>
+  <style>
+    :root{color-scheme:dark;font-family:"Segoe UI","Microsoft YaHei",sans-serif;font-size:13px}
+    *{box-sizing:border-box}body{margin:0;background:#17191e;color:#e8ebf0}
+    .wrap{max-width:720px;margin:auto;padding:16px 20px 12px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    h1{font-size:19px;line-height:1.2;margin:0;font-weight:650;letter-spacing:.01em}
+    .sub{color:#a4aab6;margin:5px 0 0;font-size:12px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    button{font:inherit;cursor:pointer;border:1px solid #414752;background:#242830;color:#e9edf5;border-radius:6px;padding:7px 11px;min-height:32px}
+    button:hover:not(:disabled){background:#303742;border-color:#6a7484}button:focus-visible{outline:2px solid #8eb9ff;outline-offset:2px}
+    button.primary{background:#3267b4;border-color:#4276c0;color:#fff}button.primary:hover:not(:disabled){background:#3d77ce}
+    button:disabled{opacity:.5;cursor:default}.status{min-height:18px;padding:3px 0;color:#ffd485;font-size:12px}
+    .list{display:grid;gap:7px}.card{background:#20232a;border:1px solid #373c46;border-radius:8px;padding:9px 12px}
+    .card.current{background:#202b3a;border-color:#4f7fc1;box-shadow:inset 3px 0 #75aaff;padding-left:13px}
+    .head{display:flex;align-items:center;justify-content:space-between;gap:10px}.identity{min-width:0}.identity-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.name{font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .email{font-size:11px;color:#aab1be;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .badges{display:flex;flex-wrap:wrap;gap:5px}.tag{font-size:11px;color:#bcc3cd;border:1px solid #424954;border-radius:4px;padding:2px 5px;line-height:1.2}
+    .tag.active{color:#c5dcff;border-color:#5a86c3;background:#283e5c}.tag.warning{color:#ffd28d;border-color:#80633d;background:#443624}
+    .metrics{display:grid;grid-template-columns:minmax(120px,1.3fr) minmax(125px,1fr) minmax(105px,.8fr);gap:12px;margin-top:6px;padding-top:6px;border-top:1px solid #383e48;align-items:end}
+    .label{font-size:11px;color:#aeb6c2;margin-bottom:3px}.value{font-variant-numeric:tabular-nums;font-size:21px;line-height:1.05;font-weight:700;color:#d9ecff;letter-spacing:-.02em}
+    .value.high,.reset.high{color:#ffc66d}.reset{font-size:14px;line-height:1.15;font-weight:650;font-variant-numeric:tabular-nums;color:#e8f1ff;white-space:nowrap}
+    .weekly{font-size:15px;line-height:1.1;font-weight:650;font-variant-numeric:tabular-nums}.detail{font-size:11px;color:#aeb6c2;margin-top:4px;line-height:1.25}
+    .track{height:4px;border-radius:2px;background:#424954;margin-top:6px;overflow:hidden}.fill{height:100%;background:#7aabef}.fill.high{background:#e9b45f}
+    .foot{color:#9ea6b2;margin:10px 0 0;font-size:11px;line-height:1.4}.empty{color:#aeb6c2;padding:16px 2px}
+    @media(max-width:480px){.wrap{padding:15px 13px}.metrics{grid-template-columns:1fr 1fr;gap:9px}.metrics .week{grid-column:1/-1}.head{align-items:flex-start}h1{font-size:17px}}
+  </style>
+</head>
+<body><main class="wrap">
+  <header><div><h1>Claude 账号</h1><p class="sub">当前账号置顶，其余按 5 小时用量排序</p></div><div class="actions"><button id="sync">同步会话</button><button class="primary" id="add">添加账号</button></div></header>
+  <div id="status" class="status" aria-live="polite"></div><div id="accounts" class="list"></div>
+  <p class="foot">已保存登录不代表会话一定有效。切换会重新打开 Claude，请先等待当前任务完成。</p>
+</main>
+<script>
+const token=location.hash.slice(1),headers={'X-Window-Token':token};let busy=false,lastState='',localError='',errorUntil=0;
+const el=(tag,cls,text)=>{const x=document.createElement(tag);if(cls)x.className=cls;if(text!==undefined)x.textContent=text;return x};
+function percent(n){return n===null?'—':(Number.isInteger(n)?n:Number(n.toFixed(2)))+'%'}
+function metric(label,value,cls){const d=el('div',cls);d.append(el('div','label',label),el('div','reset',value));return d}
+async function action(action,id){
+  if(busy)return;
+  if(action==='add'&&!confirm('Claude 将重新打开以登录新账号，当前任务会中断。继续吗？'))return;
+  if(action==='sync'&&!confirm('请确认当前账号已进入 Claude 主页。同步会重新打开 Claude，继续吗？'))return;
+  busy=true;document.querySelectorAll('button').forEach(b=>b.disabled=true);document.getElementById('status').textContent='正在处理，请稍候…';
+  try{const r=await fetch('/api/action',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({action,id})});if(!r.ok)throw new Error(await r.text());await new Promise(resolve=>setTimeout(resolve,600))}
+  catch(e){localError='操作失败：'+e.message;errorUntil=Date.now()+6000}
+  finally{busy=false;lastState='';refresh()}
+}
+function renderAccount(a,disabled){
+  const card=el('article','card'+(a.current?' current':'')),head=el('div','head'),identity=el('div','identity');
+  const nameLine=el('div','identity-line');nameLine.append(el('div','name',a.name));
+  const badges=el('div','badges');if(a.current)badges.append(el('span','tag active','当前账号'));badges.append(el('span',a.saved?'tag':'tag warning',a.saved?'已保存登录':'未保存登录 · 需重新添加'));if(a.problem)badges.append(el('span','tag warning',a.problem));if(a.updated&&a.updated.includes('可能过期'))badges.append(el('span','tag warning','用量可能过期'));nameLine.append(badges);identity.append(nameLine);if(a.email)identity.append(el('div','email',a.email));
+  const btn=el('button',a.current?'':'primary',a.current?'使用中':'切换账号');btn.disabled=disabled||a.current||!a.saved;btn.dataset.id=a.id;btn.onclick=()=>action('switch',a.id);head.append(identity,btn);card.append(head);
+  const metrics=el('div','metrics'),usage=el('div');usage.append(el('div','label','5 小时已用'));const n=el('div','value'+(a.session!==null&&a.session>=90?' high':''),percent(a.session));usage.append(n);const track=el('div','track'),fill=el('div','fill'+(a.session!==null&&a.session>=90?' high':''));fill.style.width=(a.session===null?0:a.session)+'%';track.append(fill);usage.append(track);metrics.append(usage);
+  const reset=metric('5 小时重置',a.sessionReset||'等待刷新');if(a.session!==null&&a.session>=100)reset.lastChild.classList.add('high');metrics.append(reset);
+  const week=el('div','week');week.append(el('div','label','本周已用'),el('div','weekly',percent(a.weekly)),el('div','detail',a.weeklyReset?a.weeklyReset+' 重置':'重置时间待刷新'));metrics.append(week);card.append(metrics);
+  if(a.updated)card.title=a.updated;return card;
+}
+async function refresh(){
+  try{const r=await fetch('/api/state',{headers,cache:'no-store'});if(!r.ok)throw new Error('无法连接账号管理服务');const data=await r.json();const status=Date.now()<errorUntil?localError:(data.status||'');document.getElementById('status').textContent=status;
+    const signature=JSON.stringify([data.accounts,data.busy]);if(signature!==lastState&&!busy){const focused=document.activeElement?.dataset?.id;const list=document.getElementById('accounts');list.replaceChildren();for(const a of data.accounts)list.append(renderAccount(a,data.busy));if(!data.accounts.length)list.append(el('div','empty','暂无账号，请先添加。'));lastState=signature;if(focused){const target=Array.from(list.querySelectorAll('button')).find(b=>b.dataset.id===focused);if(target&&!target.disabled)target.focus()}}
+    document.getElementById('add').disabled=busy||data.busy;document.getElementById('sync').disabled=busy||data.busy;
+  }catch(e){document.getElementById('status').textContent=e.message}
+}
+document.getElementById('add').onclick=()=>action('add','');document.getElementById('sync').onclick=()=>action('sync','');refresh();setInterval(refresh,3000);
+</script></body></html>

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -365,5 +366,84 @@ func TestCookieFilesFollowAppLayout(t *testing.T) {
 	}
 	if got, want := d.cookieFiles()[0], filepath.Join(d.dir, "Network", "Cookies"); got != want {
 		t.Fatalf("with Network/: %q, want %q", got, want)
+	}
+}
+
+func TestNewAccountDiscoveryDoesNotRestartClaude(t *testing.T) {
+	now := time.Now()
+	s := newSwitcher(t.TempDir())
+	s.active, s.addingAt = "acc-new", now.Add(-time.Minute)
+	s.st.AutoSwitch = true
+	s.st.Accounts = []*Account{
+		{UUID: "acc-new", Usage: &Usage{Session: 99, CheckedAt: now}},
+		{UUID: "acc-other", Usage: &Usage{Session: 1, CheckedAt: now}},
+	}
+	// Even a full new account must finish its web login before any automatic restart.
+	for _, added := range []bool{true, false} {
+		what, action := s.afterCheck(added, true, now.Add(-time.Hour), now)
+		if action != nil || what != "" {
+			t.Fatalf("account discovery scheduled %q instead of waiting for the user", what)
+		}
+	}
+	if !strings.Contains(s.snapshot().Status, "Finish signing in") {
+		t.Fatal("missing instruction to finish login and sync manually")
+	}
+	if _, err := os.Stat(filepath.Join(s.profileDir("acc-new"), "config.json")); !os.IsNotExist(err) {
+		t.Fatalf("account metadata was treated as a saved sign-in: %v", err)
+	}
+	if got := newSwitcher(s.dir).account("acc-new"); got == nil {
+		t.Fatal("newly discovered account metadata was not retained")
+	}
+}
+
+func TestManualImportSavesCurrentSignIn(t *testing.T) {
+	d := desktop{dir: t.TempDir()}
+	s := newSwitcher(t.TempDir())
+	s.st.Accounts = []*Account{{UUID: "acc-a", Org: "org-a"}}
+	s.pendingSignIn = "acc-a"
+	s.addingAt = time.Now()
+	write(t, d.configPath(), sampleConfig)
+	write(t, d.cookieFiles()[0], "completed-login-cookies")
+	write(t, d.cookieFiles()[1], "completed-login-journal")
+	write(t, filepath.Join(d.sessionsDir(), "acc-other", "org-other", "local_one.json"), `{"sessionId":"local_one","lastActivityAt":100}`)
+
+	if err := s.importChatsInto(d, "acc-a"); err != nil {
+		t.Fatal(err)
+	}
+	saved := desktop{dir: s.profileDir("acc-a")}
+	if got, err := saved.activeAccount(); err != nil || got != "acc-a" {
+		t.Fatalf("saved account = %q, error = %v", got, err)
+	}
+	if got := read(t, filepath.Join(saved.dir, "Cookies")); got != "completed-login-cookies" {
+		t.Fatalf("saved cookies = %q", got)
+	}
+	if got := read(t, filepath.Join(saved.dir, "Cookies-journal")); got != "completed-login-journal" {
+		t.Fatalf("saved cookie journal = %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(d.sessionsDir(), "acc-a", "org-a", "local_one.json")); err != nil {
+		t.Fatalf("existing session sync no longer works: %v", err)
+	}
+	if s.pendingSignIn != "" {
+		t.Fatal("successful manual sync did not finish the pending sign-in")
+	}
+	if !s.addingAt.IsZero() {
+		t.Fatal("successful manual sync did not finish adding an existing account")
+	}
+}
+
+func TestManualImportReportsSnapshotFailure(t *testing.T) {
+	d := desktop{dir: t.TempDir()}
+	s := newSwitcher(t.TempDir())
+	s.st.Accounts = []*Account{{UUID: "acc-a", Org: "org-a"}}
+	s.pendingSignIn = "acc-a"
+	write(t, d.configPath(), sampleConfig)
+	write(t, d.cookieFiles()[0], "completed-login-cookies")
+	write(t, s.profileDir("acc-a"), "a file blocks the profile directory")
+
+	if err := s.importChatsInto(d, "acc-a"); err == nil || !strings.Contains(err.Error(), "save current sign-in") {
+		t.Fatalf("snapshot failure was not reported: %v", err)
+	}
+	if s.pendingSignIn != "acc-a" {
+		t.Fatal("failed snapshot was marked as completed")
 	}
 }

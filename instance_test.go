@@ -1,10 +1,39 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"net"
 	"testing"
 	"time"
 )
+
+func TestExistingInstanceOpensWindow(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	opened := make(chan struct{})
+	go serveInstance(l, func() {}, func() { close(opened) })
+	conn, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err = fmt.Fprintln(conn, "open-window"); err != nil {
+		t.Fatal(err)
+	}
+	response, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil || response != "opened\n" {
+		t.Fatalf("response %q: %v", response, err)
+	}
+	select {
+	case <-opened:
+	case <-time.After(time.Second):
+		t.Fatal("window was not opened")
+	}
+}
 
 func TestInstanceHello(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")

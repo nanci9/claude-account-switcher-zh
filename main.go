@@ -1,4 +1,5 @@
 // Command claude-account-switcher is a tray tool for the Claude desktop app.
+// Local Simplified Chinese UI adaptation, 2026-10-29.
 // It switches the app between signed-in accounts without signing in again,
 // keeps Claude Code chats visible in every account and shows plan usage.
 package main
@@ -16,10 +17,13 @@ import (
 	"fyne.io/systray"
 )
 
-const version = "0.3.5"
+const version = "0.3.6"
 
 func main() {
-	status := flag.Bool("status", false, "print accounts and usage, then exit")
+	if len(os.Args) == 2 && os.Args[1] == resumeFlag {
+		os.Exit(runResumeDialog())
+	}
+	status := flag.Bool("status", false, "显示账号和额度后退出")
 	flag.Parse()
 
 	// The home folder, because the Store app redirects AppData for everything
@@ -45,6 +49,7 @@ func main() {
 
 	lock, ok := lockInstance(instancePort)
 	if !ok {
+		requestAccountWindow()
 		return
 	}
 	defer lock.Close()
@@ -52,6 +57,12 @@ func main() {
 
 	log.Printf("claude-account-switcher %s, app data in %s", version, claudeDesktop().dir)
 	t := &tray{s: newSwitcher(dir), updates: make(chan struct{}, 1)}
+	t.window, err = newAccountWindow(t.s)
+	if err != nil {
+		log.Printf("account window: %v", err)
+	} else {
+		go t.window.open()
+	}
 	// When a newer version starts, a running switch finishes first and no new
 	// one begins before this one quits.
 	go serveInstance(lock, func() {
@@ -59,6 +70,10 @@ func main() {
 			time.Sleep(200 * time.Millisecond)
 		}
 		systray.Quit()
+	}, func() {
+		if t.window != nil {
+			t.window.open()
+		}
 	})
 	systray.Run(t.onReady, func() {})
 }
@@ -89,13 +104,13 @@ func printStatus(s *switcher) {
 	s.check(ctx)
 	snap := s.snapshot()
 	if len(snap.Accounts) == 0 {
-		fmt.Println("no accounts yet, sign in to Claude")
+		fmt.Println("尚未添加账号，请先登录 Claude")
 	}
 	for _, a := range snap.Accounts {
 		mark := " "
 		if a.UUID == snap.Active {
 			mark = "*"
 		}
-		fmt.Printf("%s %s  %s\n", mark, a.label(), usageText(a, snap.Threshold, time.Now()))
+		fmt.Printf("%s %s  %s\n", mark, a.label(), usageTextZH(a, snap.Threshold, time.Now()))
 	}
 }

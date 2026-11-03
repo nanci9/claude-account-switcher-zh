@@ -1,3 +1,4 @@
+// Local Simplified Chinese dialog adaptation, 2026-10-29.
 package main
 
 import (
@@ -8,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -124,35 +124,55 @@ func desktopRunning() bool {
 	return len(pids) > 0
 }
 
-// quitDesktop asks the app to close, then ends it if it is still running.
+// quitDesktop lets Claude flush its sign-in before any profile files change.
 func quitDesktop() error {
 	pids, _ := desktopProcesses()
+	return quitDesktopProcesses(pids, endSession, waitGone)
+}
+
+func quitDesktopProcesses(pids []uint32, requestQuit func([]uint32), wait func(time.Duration) bool) error {
 	if len(pids) == 0 {
 		return nil
 	}
 	began := time.Now()
-	run("taskkill", pidArgs(pids)...)
-	if waitGone(8 * time.Second) {
-		log.Printf("Claude closed after %s", time.Since(began).Round(100*time.Millisecond))
+	requestQuit(pids)
+	if wait(20 * time.Second) {
+		log.Printf("Claude quit after %s", time.Since(began).Round(100*time.Millisecond))
 		return nil
 	}
-	pids, _ = desktopProcesses()
-	// No /T: that would also end anything started from a Claude terminal,
-	// including this switcher. Every app process is listed in pids anyway.
-	run("taskkill", append([]string{"/F"}, pidArgs(pids)...)...)
-	if waitGone(10 * time.Second) {
-		log.Printf("Claude did not close on request, ended it after %s", time.Since(began).Round(100*time.Millisecond))
-		return nil
-	}
+	// Force-ending Claude can discard the web session it has not flushed yet.
+	log.Printf("Claude did not quit normally; cancelled without force-ending it to preserve the sign-in")
 	return errors.New("Claude did not quit")
 }
 
-func pidArgs(pids []uint32) []string {
-	var args []string
+var (
+	user32                 = windows.NewLazySystemDLL("user32.dll")
+	procSendMessageTimeout = user32.NewProc("SendMessageTimeoutW")
+	enumAppWindows         = windows.NewCallback(endSessionOf)
+	endingPids             map[uint32]bool
+)
+
+const (
+	wmEndSession       = 0x0016
+	endSessionCloseApp = 0x1
+	smtoAbortIfHung    = 0x2
+)
+
+// A close request only hides Claude in the tray; the installer message quits it.
+func endSession(pids []uint32) {
+	endingPids = map[uint32]bool{}
 	for _, p := range pids {
-		args = append(args, "/PID", strconv.FormatUint(uint64(p), 10))
+		endingPids[p] = true
 	}
-	return args
+	_ = windows.EnumWindows(enumAppWindows, nil)
+}
+
+func endSessionOf(hwnd windows.HWND, _ uintptr) uintptr {
+	var pid uint32
+	if _, err := windows.GetWindowThreadProcessId(hwnd, &pid); err == nil && endingPids[pid] {
+		procSendMessageTimeout.Call(uintptr(hwnd), wmEndSession, 1, endSessionCloseApp, smtoAbortIfHung, 2000, 0)
+	}
+	return 1
 }
 
 func waitGone(timeout time.Duration) bool {
@@ -224,8 +244,8 @@ func launch(exe string) error { return start(exe) }
 // askToQuitOld tells the user to quit a switcher from before 0.3.3, which
 // holds the instance port without answering hello.
 func askToQuitOld() {
-	title, _ := windows.UTF16PtrFromString("Claude Account Switcher")
-	text, _ := windows.UTF16PtrFromString("An older Claude Account Switcher is still running. Choose Quit in its tray menu, then start this one again.")
+	title, _ := windows.UTF16PtrFromString("Claude 账号切换器")
+	text, _ := windows.UTF16PtrFromString("旧版 Claude 账号切换器仍在运行。请在它的托盘菜单中选择“Quit（退出）”，然后重新启动此版本。")
 	windows.MessageBox(0, text, title, windows.MB_OK|windows.MB_ICONINFORMATION)
 }
 
@@ -288,8 +308,6 @@ func hidden(cmd *exec.Cmd) *exec.Cmd {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_NO_WINDOW}
 	return cmd
 }
-
-func run(name string, args ...string) { _ = hidden(exec.Command(name, args...)).Run() }
 
 func output(name string, args ...string) (string, error) {
 	out, err := hidden(exec.Command(name, args...)).Output()

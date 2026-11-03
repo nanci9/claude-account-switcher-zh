@@ -84,6 +84,8 @@ const (
 	idleFor = 15 * time.Minute
 	// The menu says why the last auto switch happened for this long.
 	noteFor = 12 * time.Hour
+	// Give the user time to choose which interrupted chats continue.
+	resumeWait = 30 * time.Second
 
 	// The usage endpoint rate-limits per account, and Claude polls it too.
 	// The active account is checked more often once it gets close.
@@ -105,7 +107,9 @@ type switcher struct {
 	busy     atomic.Bool
 	status   string
 	addingAt time.Time
-	onChange func()
+	// OAuth discovery does not mean the desktop web login has finished.
+	pendingSignIn string
+	onChange      func()
 	// After a 429, an account is not asked again before its backoff ends.
 	backoff map[string]time.Time
 	strikes map[string]int
@@ -180,7 +184,7 @@ func (s *switcher) refresh(ctx context.Context) {
 }
 
 // check fetches the usage that is due and saves it. It never restarts Claude,
-// so -status can use it; the switch or import it finds due is returned instead.
+// so -status can use it; any automatic switch it finds due is returned instead.
 func (s *switcher) check(ctx context.Context) (string, func() error) {
 	if s.busy.Load() {
 		return "", nil
@@ -268,22 +272,29 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 	}
 
 	lastChat := lastChatWrite(s.app().sessionsDir())
+	return s.afterCheck(added, desktopRunning(), lastChat, time.Now())
+}
+
+// afterCheck publishes refreshed account state without interrupting a new sign-in.
+func (s *switcher) afterCheck(added, running bool, lastChat, now time.Time) (string, func() error) {
 	s.mu.Lock()
 	adding := !s.addingAt.IsZero()
 	if added && adding {
 		s.addingAt = time.Time{}
-	} else if adding && time.Since(s.addingAt) > 15*time.Minute {
+		s.pendingSignIn = s.active
+		s.status = "Account detected. Finish signing in, then choose Import all chats to save the sign-in and sync chats."
+	} else if adding && now.Sub(s.addingAt) > 15*time.Minute {
 		s.addingAt, s.status = time.Time{}, ""
 	}
 	s.saveState()
-	target, cause := s.autoTarget(desktopRunning(), lastChat, time.Now())
+	target, cause := s.autoTarget(running, lastChat, now)
 	s.mu.Unlock()
 	s.onChange()
 
 	switch {
 	case added && adding:
-		// A fresh sign-in: restart once so the chats of the other accounts show up.
-		return "Importing chats", s.importChats
+		// OAuth account discovery can precede the web session's cookie write.
+		return "", nil
 	case target != nil:
 		return "Auto switch", func() error { return s.switchTo(target.UUID, cause) }
 	}
@@ -294,6 +305,9 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 // nearly full, or another one's week is about to reset mostly unused.
 // lastChat is when a chat was last active. Callers hold s.mu.
 func (s *switcher) autoTarget(running bool, lastChat, now time.Time) (*Account, switchCause) {
+	if s.pendingSignIn != "" && s.pendingSignIn == s.active {
+		return nil, byHand
+	}
 	cur := s.account(s.active)
 	if !running || cur == nil || cur.Usage == nil || now.Sub(cur.Usage.CheckedAt) > activeFresh || now.Sub(s.st.LastSwitch) < autoCooldown {
 		return nil, byHand
@@ -366,6 +380,8 @@ func (s *switcher) run(what string, f func() error) {
 // restart closes the app, runs change on its files and starts it again. If
 // change fails, the app files are put back as they were.
 func (s *switcher) restart(change func(active string) error) error {
+	quitAt := time.Now()
+	running := runningChats(projectsDir(), quitAt)
 	if err := quitDesktop(); err != nil {
 		return err
 	}
@@ -390,7 +406,35 @@ func (s *switcher) restart(change func(active string) error) error {
 			log.Printf("restore backup %s: %v", bk, rerr)
 		}
 	}
+	s.askResume(quitAt, running)
 	return err
+}
+
+// askResume preserves the upstream stopped-chat selection before Claude restarts.
+func (s *switcher) askResume(quitAt time.Time, running map[string]bool) {
+	uuid, err := s.app().activeAccount()
+	s.mu.Lock()
+	a := s.account(uuid)
+	s.mu.Unlock()
+	if err != nil || a == nil {
+		return
+	}
+	cut := takeCutChats(s.app().sessionsDir(), a.UUID, a.Org, quitAt, running)
+	if len(cut) == 0 {
+		return
+	}
+	keep := chooseResume(a.label(), cut, resumeWait)
+	n := 0
+	for i, c := range cut {
+		if keep[i] {
+			n++
+			continue
+		}
+		if err := clearCutMark(c.path); err != nil {
+			log.Printf("clear quit mark of %s: %v", c.path, err)
+		}
+	}
+	log.Printf("%d of %d stopped chats continue in %s", n, len(cut), a.label())
 }
 
 // saveActive keeps the signed-in account's latest login before it is replaced.
@@ -444,6 +488,7 @@ func (s *switcher) switchTo(uuid string, cause switchCause) error {
 			// The user's pick ends spending another account's week.
 			s.st.HandSwitch = s.st.LastSwitch
 			s.st.Spending, s.st.SpendUntil = "", time.Time{}
+			s.pendingSignIn = ""
 		case spendWeekly:
 			if target.Usage != nil {
 				s.st.Spending, s.st.SpendUntil = uuid, target.Usage.WeeklyReset
@@ -477,23 +522,44 @@ func (s *switcher) addAccount() error {
 func (s *switcher) importChats() error {
 	s.setStatus("Importing chats…")
 	return s.restart(func(active string) error {
-		s.mu.Lock()
-		a := s.account(active)
-		s.mu.Unlock()
-		if a == nil {
-			return errors.New("no signed-in account")
-		}
-		n, err := syncSessions(s.app().sessionsDir(), a.UUID, a.Org)
-		log.Printf("%d chats imported into %s", n, a.label())
-		s.importProjects(a)
-		return err
+		return s.importChatsInto(s.app(), active)
 	})
+}
+
+// importChatsInto runs only after Claude has closed, so its login files are stable.
+func (s *switcher) importChatsInto(d desktop, active string) error {
+	s.mu.Lock()
+	a := s.account(active)
+	s.mu.Unlock()
+	if a == nil {
+		return errors.New("no signed-in account")
+	}
+	n, err := syncSessions(d.sessionsDir(), a.UUID, a.Org)
+	log.Printf("%d chats imported into %s", n, a.label())
+	if err != nil {
+		return err
+	}
+	s.importProjectsInto(d, a)
+	if err := saveProfile(d, s.profileDir(active)); err != nil {
+		return fmt.Errorf("save current sign-in: %w", err)
+	}
+	s.mu.Lock()
+	if s.pendingSignIn == active {
+		s.pendingSignIn = ""
+	}
+	s.addingAt = time.Time{}
+	s.mu.Unlock()
+	return nil
 }
 
 // importProjects copies the projects of all accounts into a. A failure only
 // costs the project grouping, so it is logged and the switch goes on.
 func (s *switcher) importProjects(a *Account) {
-	n, err := syncSpaces(s.app().spacesDir(), a.UUID, a.Org, filepath.Join(s.dir, "spaces-seen.json"))
+	s.importProjectsInto(s.app(), a)
+}
+
+func (s *switcher) importProjectsInto(d desktop, a *Account) {
+	n, err := syncSpaces(d.spacesDir(), a.UUID, a.Org, filepath.Join(s.dir, "spaces-seen.json"))
 	if err != nil {
 		log.Printf("projects not imported into %s: %v", a.label(), err)
 		return

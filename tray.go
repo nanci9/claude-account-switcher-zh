@@ -1,3 +1,4 @@
+// Modified 2026-10-29: local Simplified Chinese UI; account/session logic unchanged.
 package main
 
 import (
@@ -17,6 +18,7 @@ var thresholds = []float64{90, 94, 96, 98}
 
 type tray struct {
 	s          *switcher
+	window     *accountWindow
 	status     *systray.MenuItem
 	update     *systray.MenuItem
 	accounts   [maxAccounts]*systray.MenuItem
@@ -31,27 +33,31 @@ type tray struct {
 }
 
 func (t *tray) onReady() {
-	systray.SetTooltip("Claude Account Switcher")
+	systray.SetTooltip("Claude 账号切换器（简体中文）")
 	t.setIcon(-1, defaultThreshold)
+	title := systray.AddMenuItem("Claude 账号切换器 · 登录保护版", "基于 v"+version+" 的本地中文修复构建（2026-11-02）")
+	title.Disable()
+	systray.AddSeparator()
+	openWindow := systray.AddMenuItem("打开账号管理窗口", "查看账号状态并切换")
 
 	t.status = systray.AddMenuItem("", "")
 	t.status.Disable()
 	t.status.Hide()
-	t.update = systray.AddMenuItem("", "Download the new version and restart on it")
+	t.update = systray.AddMenuItem("", "下载官方版本并重启；更新会覆盖中文界面和本地登录保护修复")
 	t.update.Hide()
 	for i := range t.accounts {
-		t.accounts[i] = systray.AddMenuItemCheckbox("", "Switch the Claude app to this account", false)
+		t.accounts[i] = systray.AddMenuItemCheckbox("", "将 Claude 切换到此账号", false)
 		t.accounts[i].Hide()
 	}
 	systray.AddSeparator()
-	t.auto = systray.AddMenuItemCheckbox("Auto-switch when nearly full", "Switch to the account with the most room left", false)
-	limit := systray.AddMenuItem("Auto-switch at", "")
+	t.auto = systray.AddMenuItemCheckbox("额度将用尽时自动切换", "切换到剩余额度最多的账号", false)
+	limit := systray.AddMenuItem("自动切换阈值", "当前额度使用达到此比例时触发")
 	for _, v := range thresholds {
 		t.thresholds = append(t.thresholds, limit.AddSubMenuItemCheckbox(fmt.Sprintf("%.0f%%", v), "", false))
 	}
-	t.spend = systray.AddMenuItemCheckbox("Auto-switch to use up expiring weekly", "Switch to an account whose weekly limit resets within a day with half or more of it unused", false)
-	t.add = systray.AddMenuItem("Add account…", "Restart Claude on its sign-in screen, your current account is kept")
-	t.importNow = systray.AddMenuItem("Import chats from all accounts", "Restart Claude so every chat shows up in this account")
+	t.spend = systray.AddMenuItemCheckbox("自动切换至周额度即将重置的账号", "切换到周额度将在一天内重置、且剩余额度至少一半的账号", false)
+	t.add = systray.AddMenuItem("添加账号…", "保存当前账号登录信息，并重启 Claude 进入登录界面")
+	t.importNow = systray.AddMenuItem("同步所有账号的开发会话", "确认已进入聊天主页后使用：正常退出 Claude，保存登录并同步本地 Code 会话")
 	systray.AddSeparator()
 	// Rewriting an enabled entry keeps its path current and adds the Task
 	// Manager record that entries from before v0.1.2 are missing.
@@ -60,9 +66,9 @@ func (t *tray) onReady() {
 			log.Printf("refresh start at login: %v", err)
 		}
 	}
-	t.autostart = systray.AddMenuItemCheckbox("Start at login", "", autostartEnabled())
-	folder := systray.AddMenuItem("Open data folder", "")
-	quit := systray.AddMenuItem("Quit", "")
+	t.autostart = systray.AddMenuItemCheckbox("登录 Windows 时启动", "", autostartEnabled())
+	folder := systray.AddMenuItem("打开数据文件夹", "")
+	quit := systray.AddMenuItem("退出切换器", "仅退出切换器，不关闭 Claude")
 
 	for i, item := range t.accounts {
 		go func() {
@@ -85,6 +91,10 @@ func (t *tray) onReady() {
 	go func() {
 		for {
 			select {
+			case <-openWindow.ClickedCh:
+				if t.window != nil {
+					t.window.open()
+				}
 			case <-t.auto.ClickedCh:
 				t.s.setAuto(!t.auto.Checked())
 			case <-t.spend.ClickedCh:
@@ -158,34 +168,34 @@ func (t *tray) render() {
 
 	switch {
 	case snap.Status != "":
-		t.status.SetTitle(snap.Status)
+		t.status.SetTitle(localizeStatusZH(snap.Status))
 		t.status.Show()
 	case snap.Note != "":
-		t.status.SetTitle(snap.Note)
+		t.status.SetTitle(localizeStatusZH(snap.Note))
 		t.status.Show()
 	default:
 		t.status.Hide()
 	}
 	if snap.Update != "" {
-		t.update.SetTitle("Version " + snap.Update + " is out, click to update")
+		t.update.SetTitle("发现官方版本 " + snap.Update + "（更新会覆盖本地修复）")
 		t.update.Show()
 	} else {
 		t.update.Hide()
 	}
 	if len(snap.Accounts) == 0 && snap.Status == "" {
-		t.status.SetTitle("Open Claude and sign in")
+		t.status.SetTitle("请打开 Claude 并登录账号")
 		t.status.Show()
 	}
 
 	activePct := -1.0
-	tip := "Claude Account Switcher"
+	tip := "Claude 账号切换器（简体中文）"
 	for i, item := range t.accounts {
 		if i >= len(snap.Accounts) {
 			item.Hide()
 			continue
 		}
 		a := snap.Accounts[i]
-		detail := usageText(a, snap.Threshold, now)
+		detail := usageTextZH(a, snap.Threshold, now)
 		item.SetTitle(a.label() + menuTab + detail)
 		setChecked(item, a.UUID == snap.Active)
 		if snap.Busy {

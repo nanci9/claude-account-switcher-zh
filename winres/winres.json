@@ -6,7 +6,7 @@
           "name": "SnlperStripes.ClaudeAccountSwitcher",
           "version": ""
         },
-        "description": "Claude Account Switcher",
+        "description": "Claude 账号切换器（简体中文本地构建）",
         "minimum-os": "win10",
         "execution-level": "as invoker",
         "dpi-awareness": "per monitor v2",
@@ -24,12 +24,12 @@
         "info": {
           "0409": {
             "CompanyName": "SnlperStripes",
-            "FileDescription": "Claude Account Switcher",
+            "FileDescription": "Claude 账号切换器（简体中文本地构建）",
             "InternalName": "claude-account-switcher",
             "LegalCopyright": "Copyright 2026 SnlperStripes, Apache License 2.0",
             "OriginalFilename": "claude-account-switcher-windows-amd64.exe",
-            "ProductName": "Claude Account Switcher",
-            "Comments": "https://github.com/SnlperStripes/claude-account-switcher"
+            "ProductName": "Claude 账号切换器",
+            "Comments": "Local Simplified Chinese UI and login protections. Based on upstream v0.3.6. https://github.com/SnlperStripes/claude-account-switcher"
           }
         }
       }
