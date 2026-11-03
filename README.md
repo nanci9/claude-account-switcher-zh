@@ -36,16 +36,14 @@ Get-FileHash .\claude-account-switcher-windows-amd64.exe -Algorithm SHA256
 
 ## 数据与隐私
 
-- 登录快照、设置、备份和日志位于 `%USERPROFILE%\.claude-account-switcher`；这些文件可能包含敏感信息，请勿上传、分享或提交到 Git。
+- 登录信息和备份保存在本机。数据文件和日志可能包含敏感信息，请勿随意分享。
 - 程序访问 Anthropic 服务以读取账号和用量；检查更新时访问 GitHub。请根据自己的网络环境与服务条款使用。
 - 程序切换的是 Claude Desktop 的登录状态，不切换终端里独立登录的 Claude Code CLI。
 - Claude 的本地文件格式属于其内部实现，桌面版更新后可能影响切号或会话同步；重要数据请自行备份。
 
 ## 更新说明
 
-中文版的更新检查和下载地址均指向 **本仓库的 Releases**，不会自动下载原作者仓库的程序。后续可以参考上游代码合并功能，但发布前需要重新测试，并确认更新地址仍指向本仓库。上游原版和本中文版的更新不能互换。
-
-从早期本地二开版迁移时，请从本仓库 Releases 手动下载最新版；旧程序的更新地址可能不同，不要使用旧版更新入口。
+程序从本项目检查和下载更新；也可以前往 [Releases](https://github.com/nanci9/claude-account-switcher-zh/releases/latest) 手动下载最新版。
 
 ## 从源码构建
 
