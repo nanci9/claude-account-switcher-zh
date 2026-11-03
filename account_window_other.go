@@ -1,3 +1,4 @@
+// 中文社区版修改文件；变更概述见 MODIFICATIONS.md。
 //go:build !windows
 
 package main

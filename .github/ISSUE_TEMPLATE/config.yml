@@ -1,8 +1,6 @@
-blank_issues_enabled: false
+# 中文社区版修改文件；变更概述见 MODIFICATIONS.md。
+blank_issues_enabled: true
 contact_links:
-  - name: Question or idea to discuss
-    url: https://github.com/SnlperStripes/claude-account-switcher/discussions
-    about: Ask how something works or share how you use it.
-  - name: Security problem
-    url: https://github.com/SnlperStripes/claude-account-switcher/security/advisories/new
-    about: Report it privately, not in a public issue.
+  - name: 私密安全问题反馈
+    url: https://github.com/nanci9/claude-account-switcher/security/advisories/new
+    about: 请勿在公开 issue 中发布登录信息。

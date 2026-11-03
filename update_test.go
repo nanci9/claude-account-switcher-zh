@@ -1,3 +1,4 @@
+// 中文社区版修改文件；变更概述见 MODIFICATIONS.md。
 package main
 
 import (
@@ -135,5 +136,18 @@ func TestReplaceExe(t *testing.T) {
 	restoreExe(exe)
 	if got, _ := os.ReadFile(exe); string(got) != "old" {
 		t.Fatalf("exe = %q after restoring", got)
+	}
+}
+
+// The Chinese edition must never install an upstream binary over its own UI.
+func TestUpdateSourceIsChineseEdition(t *testing.T) {
+	if repoURL != "https://github.com/nanci9/claude-account-switcher" {
+		t.Fatalf("update repository = %q", repoURL)
+	}
+	if latestAPI != "https://api.github.com/repos/nanci9/claude-account-switcher/releases/latest" {
+		t.Fatalf("update API = %q", latestAPI)
+	}
+	if releasesURL != repoURL+"/releases" {
+		t.Fatalf("release source = %q", releasesURL)
 	}
 }

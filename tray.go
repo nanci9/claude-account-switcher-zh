@@ -1,3 +1,4 @@
+// 中文社区版修改文件；变更概述见 MODIFICATIONS.md。
 // Modified 2026-10-29: local Simplified Chinese UI; account/session logic unchanged.
 package main
 
@@ -43,7 +44,7 @@ func (t *tray) onReady() {
 	t.status = systray.AddMenuItem("", "")
 	t.status.Disable()
 	t.status.Hide()
-	t.update = systray.AddMenuItem("", "下载官方版本并重启；更新会覆盖中文界面和本地登录保护修复")
+	t.update = systray.AddMenuItem("", "下载本项目中文版并重启")
 	t.update.Hide()
 	for i := range t.accounts {
 		t.accounts[i] = systray.AddMenuItemCheckbox("", "将 Claude 切换到此账号", false)
@@ -177,7 +178,7 @@ func (t *tray) render() {
 		t.status.Hide()
 	}
 	if snap.Update != "" {
-		t.update.SetTitle("发现官方版本 " + snap.Update + "（更新会覆盖本地修复）")
+		t.update.SetTitle("发现中文版更新 " + snap.Update)
 		t.update.Show()
 	} else {
 		t.update.Hide()

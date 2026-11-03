@@ -1,3 +1,4 @@
+// 中文社区版修改文件；变更概述见 MODIFICATIONS.md。
 // Command claude-account-switcher is a tray tool for the Claude desktop app.
 // Local Simplified Chinese UI adaptation, 2026-10-29.
 // It switches the app between signed-in accounts without signing in again,
@@ -17,7 +18,7 @@ import (
 	"fyne.io/systray"
 )
 
-const version = "0.3.6"
+const version = "0.3.7"
 
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == resumeFlag {

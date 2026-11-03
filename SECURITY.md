@@ -1,22 +1,5 @@
-# Security
+# 安全问题反馈
 
-The switcher handles Claude sign-in tokens, so security reports matter a lot here.
+本工具处理 Claude 登录状态。如果发现可能泄露账号、Cookie、令牌或本地数据的问题，请勿在公开 Issue 中粘贴真实凭据或日志。
 
-## Reporting a problem
-
-Please **do not open a public issue.** Report it privately instead:
-[Report a vulnerability](https://github.com/SnlperStripes/claude-account-switcher/security/advisories/new).
-
-Include what you found, how to reproduce it, and which version you tested. You should get an answer within a week.
-
-## What counts
-
-Anything that could expose or misuse a saved sign-in, for example:
-
-- Tokens or cookies written in plain text, logged, or sent anywhere other than `api.anthropic.com`
-- Other users or programs on the machine being able to read the saved sign-ins more easily than Claude's own files
-- A release binary that does not match its `.sha256` file or the source
-
-## Supported versions
-
-Only the latest release gets fixes.
+请通过本仓库的 [私密漏洞报告](https://github.com/nanci9/claude-account-switcher/security/advisories/new) 联系维护者，并说明版本、问题和不含敏感信息的复现方法。
