@@ -2,5 +2,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: 私密安全问题反馈
-    url: https://github.com/nanci9/claude-account-switcher/security/advisories/new
+    url: https://github.com/nanci9/claude-account-switcher-zh/security/advisories/new
     about: 请勿在公开 issue 中发布登录信息。

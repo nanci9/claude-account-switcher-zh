@@ -21,12 +21,12 @@ import (
 )
 
 const (
-	repoURL = "https://github.com/nanci9/claude-account-switcher"
+	repoURL = "https://github.com/nanci9/claude-account-switcher-zh"
 	// GitHub is asked for the latest release at most this often.
 	updateEvery = 24 * time.Hour
 )
 
-var latestAPI = "https://api.github.com/repos/nanci9/claude-account-switcher/releases/latest"
+var latestAPI = "https://api.github.com/repos/nanci9/claude-account-switcher-zh/releases/latest"
 
 // latestRelease asks GitHub for the version of the latest release, like "0.3.0".
 // Nothing about the user or their accounts goes along.

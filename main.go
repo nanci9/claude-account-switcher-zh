@@ -18,7 +18,7 @@ import (
 	"fyne.io/systray"
 )
 
-const version = "0.3.7"
+const version = "0.3.8"
 
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == resumeFlag {

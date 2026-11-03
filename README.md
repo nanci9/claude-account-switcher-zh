@@ -1,4 +1,4 @@
-# Claude 账号切换器 · 中文版
+# Claude Account Switcher 中文版 · Claude 账号切换器
 
 面向 **Claude Desktop Windows 桌面版**的多账号管理工具：在中文界面查看账号和额度，一键切换已保存的登录状态，并尝试同步桌面版 Claude Code 的本地开发会话。
 
@@ -21,7 +21,7 @@
 
 ## 下载和使用
 
-1. 前往 [Releases 下载页](https://github.com/nanci9/claude-account-switcher/releases/latest)，下载 `claude-account-switcher-windows-amd64.exe`。需要 Windows 10/11 64 位、Claude Desktop 和 Microsoft Edge WebView2 Runtime。
+1. 前往 [Releases 下载页](https://github.com/nanci9/claude-account-switcher-zh/releases/latest)，下载 `claude-account-switcher-windows-amd64.exe`。需要 Windows 10/11 64 位、Claude Desktop 和 Microsoft Edge WebView2 Runtime。
 2. 在 Claude Desktop 登录第一个账号，运行下载的程序，等待账号显示在窗口中。
 3. 点击「添加账号」，按提示登录其他账号；确认已进入聊天主页后，可点击「同步会话」保存当前登录并同步本地开发会话。同步会重新打开 Claude，请先保存正在进行的工作。
 4. 以后在账号窗口中选择「切换账号」。也可通过系统托盘菜单打开窗口或退出切换器。
@@ -45,7 +45,7 @@ Get-FileHash .\claude-account-switcher-windows-amd64.exe -Algorithm SHA256
 
 中文版的更新检查和下载地址均指向 **本仓库的 Releases**，不会自动下载原作者仓库的程序。后续可以参考上游代码合并功能，但发布前需要重新测试，并确认更新地址仍指向本仓库。上游原版和本中文版的更新不能互换。
 
-从旧的本地二开版迁移时，请从本仓库 Releases 手动下载中文版；旧程序中的“官方更新”入口仍可能指向上游，不要点击它。
+从早期本地二开版迁移时，请从本仓库 Releases 手动下载中文版；旧程序中的“官方更新”入口可能指向上游，不要点击它。此前发布在 [旧 Fork](https://github.com/nanci9/claude-account-switcher) 的 0.3.7 版本，可通过旧 Fork 的 0.3.8 更新切换到本独立仓库；更新后今后的版本检查和下载均来自本仓库。
 
 ## 从源码构建
 

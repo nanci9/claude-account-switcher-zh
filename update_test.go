@@ -141,10 +141,10 @@ func TestReplaceExe(t *testing.T) {
 
 // The Chinese edition must never install an upstream binary over its own UI.
 func TestUpdateSourceIsChineseEdition(t *testing.T) {
-	if repoURL != "https://github.com/nanci9/claude-account-switcher" {
+	if repoURL != "https://github.com/nanci9/claude-account-switcher-zh" {
 		t.Fatalf("update repository = %q", repoURL)
 	}
-	if latestAPI != "https://api.github.com/repos/nanci9/claude-account-switcher/releases/latest" {
+	if latestAPI != "https://api.github.com/repos/nanci9/claude-account-switcher-zh/releases/latest" {
 		t.Fatalf("update API = %q", latestAPI)
 	}
 	if releasesURL != repoURL+"/releases" {
