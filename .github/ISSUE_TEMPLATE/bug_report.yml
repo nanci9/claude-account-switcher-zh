@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time. Please **do not paste tokens, cookies or `config.json`** here.
-        The log below never contains tokens, but look over it before you post.
+        Logs can contain sensitive information; review and redact them before posting.
   - type: textarea
     id: what
     attributes:
@@ -21,8 +21,6 @@ body:
       options:
         - Windows 11
         - Windows 10
-        - macOS (Apple silicon)
-        - macOS (Intel)
     validations:
       required: true
   - type: dropdown
@@ -32,7 +30,6 @@ body:
       options:
         - Microsoft Store
         - Direct download from claude.ai
-        - macOS app
         - Not sure
     validations:
       required: true
@@ -47,7 +44,7 @@ body:
     attributes:
       label: Switcher version
       description: The first line of `switcher.log` names it.
-      placeholder: "0.1.2"
+      placeholder: "0.3.8"
     validations:
       required: true
   - type: textarea

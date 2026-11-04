@@ -1,4 +1,4 @@
-// 中文社区版修改文件；变更概述见 MODIFICATIONS.md。
+// 中文社区版修改文件；变更概述见 docs/MODIFICATIONS.md。
 // Local Simplified Chinese dialog adaptation, 2026-10-29.
 package main
 

@@ -6,5 +6,4 @@
 
 - [ ] Windows, Microsoft Store Claude
 - [ ] Windows, direct download Claude
-- [ ] macOS
 - [ ] `go vet ./...` and `go test ./...` pass

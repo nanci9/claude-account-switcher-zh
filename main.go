@@ -1,4 +1,4 @@
-// 中文社区版修改文件；变更概述见 MODIFICATIONS.md。
+// 中文社区版修改文件；变更概述见 docs/MODIFICATIONS.md。
 // Command claude-account-switcher is a tray tool for the Claude desktop app.
 // Local Simplified Chinese UI adaptation, 2026-10-29.
 // It switches the app between signed-in accounts without signing in again,

@@ -61,4 +61,4 @@ go build -trimpath -ldflags "-H=windowsgui -s -w" -o claude-account-switcher-win
 
 - 原项目：[SnlperStripes/claude-account-switcher](https://github.com/SnlperStripes/claude-account-switcher)，作者 SnlperStripes。
 - 中文版在上游基础上增加图形界面、汉化、用量排序、窗口复用和登录保护，并将更新源改为本仓库。上游 v0.3.6 的任务续接功能已合并；具体变更可查看 Git 提交记录。
-- 许可证：[Apache License 2.0](LICENSE)；原作者声明见 [NOTICE](NOTICE)。分发源码或程序时请一并保留这两个文件及相应修改说明。
+- 许可证：[Apache License 2.0](LICENSE)；原作者声明见 [NOTICE](NOTICE)，中文版变更见 [修改说明](docs/MODIFICATIONS.md)。分发源码或程序时请一并保留这些文件。
