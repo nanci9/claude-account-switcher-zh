@@ -2,28 +2,28 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 	"unsafe"
 
+	webview2 "github.com/jchv/go-webview2"
 	"golang.org/x/sys/windows"
 )
 
 var (
 	findWindowEx     = user32.NewProc("FindWindowExW")
-	setWindowPos     = user32.NewProc("SetWindowPos")
 	getSystemMetrics = user32.NewProc("GetSystemMetrics")
-	isZoomed         = user32.NewProc("IsZoomed")
 	showWindow       = user32.NewProc("ShowWindow")
 	isIconic         = user32.NewProc("IsIconic")
 	setForeground    = user32.NewProc("SetForegroundWindow")
-	setThreadDPI     = user32.NewProc("SetThreadDpiAwarenessContext")
 )
 
 func accountWindowHandles() map[uintptr]bool {
 	title, _ := windows.UTF16PtrFromString("Claude 账号管理")
+	exe, _ := os.Executable()
 	result := map[uintptr]bool{}
 	var after uintptr
 	for {
@@ -36,39 +36,27 @@ func accountWindowHandles() map[uintptr]bool {
 		if _, err := windows.GetWindowThreadProcessId(windows.HWND(hwnd), &pid); err != nil {
 			continue
 		}
-		if strings.EqualFold(filepath.Base(processPath(pid)), "msedge.exe") && windows.IsWindowVisible(windows.HWND(hwnd)) {
+		if strings.EqualFold(filepath.Clean(processPath(pid)), filepath.Clean(exe)) && windows.IsWindowVisible(windows.HWND(hwnd)) {
 			result[hwnd] = true
 		}
 	}
 }
 
-// Edge may reuse its existing process and ignore --window-size; set physical pixels.
-func resizeAccountWindow(previous map[uintptr]bool) uintptr {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	old, _, _ := setThreadDPI.Call(^uintptr(3)) // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
-	if old != 0 {
-		defer setThreadDPI.Call(old)
-	}
-	var target uintptr
+func findAccountWindow(previous map[uintptr]bool) uintptr {
 	for attempt := 0; attempt < 30; attempt++ {
 		for hwnd := range accountWindowHandles() {
 			if !previous[hwnd] {
-				target = hwnd
-				break
+				return hwnd
 			}
-		}
-		if target != 0 {
-			break
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	if target == 0 {
-		return 0
-	}
-	if zoomed, _, _ := isZoomed.Call(target); zoomed != 0 {
-		showWindow.Call(target, 9)
-	} // SW_RESTORE
+	return 0
+}
+
+func runAccountWindow(url string) int {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	w, h := uintptr(760), uintptr(620)
 	sw, _, _ := getSystemMetrics.Call(0)
 	sh, _, _ := getSystemMetrics.Call(1)
@@ -78,15 +66,23 @@ func resizeAccountWindow(previous map[uintptr]bool) uintptr {
 	if sh > 0 && h > sh {
 		h = sh
 	}
-	x, y := uintptr(0), uintptr(0)
-	if sw > w {
-		x = (sw - w) / 2
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return 1
 	}
-	if sh > h {
-		y = (sh - h) / 2
+	view := webview2.NewWithOptions(webview2.WebViewOptions{
+		DataPath:      filepath.Join(home, ".claude-account-switcher", "account-webview"),
+		AutoFocus:     true,
+		WindowOptions: webview2.WindowOptions{Title: "Claude 账号管理", Width: uint(w), Height: uint(h), IconId: 1, Center: true},
+	})
+	if view == nil {
+		return 1
 	}
-	setWindowPos.Call(target, 0, x, y, w, h, 0x0014) // NOZORDER | NOACTIVATE
-	return target
+	defer view.Destroy()
+	view.Navigate(url)
+	go closeWhenParentExits(os.Stdin, func() { view.Dispatch(view.Terminate) })
+	view.Run()
+	return 0
 }
 
 func activateAccountWindow(hwnd uintptr) bool {

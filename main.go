@@ -18,9 +18,12 @@ import (
 	"fyne.io/systray"
 )
 
-const version = "0.3.8"
+const version = "0.4.0"
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "-account-window" {
+		os.Exit(runAccountWindow(os.Args[2]))
+	}
 	if len(os.Args) == 2 && os.Args[1] == resumeFlag {
 		os.Exit(runResumeDialog())
 	}

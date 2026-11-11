@@ -3,6 +3,7 @@
 
 package main
 
-func accountWindowHandles() map[uintptr]bool       { return nil }
-func resizeAccountWindow(map[uintptr]bool) uintptr { return 0 }
-func activateAccountWindow(uintptr) bool           { return false }
+func accountWindowHandles() map[uintptr]bool     { return nil }
+func findAccountWindow(map[uintptr]bool) uintptr { return 0 }
+func activateAccountWindow(uintptr) bool         { return false }
+func runAccountWindow(string) int                { return 1 }

@@ -1,4 +1,9 @@
 {
+  "RT_GROUP_ICON": {
+    "#1": {
+      "0000": ["app-16.png", "app-32.png", "app-48.png", "app-256.png"]
+    }
+  },
   "RT_MANIFEST": {
     "#1": {
       "0409": {

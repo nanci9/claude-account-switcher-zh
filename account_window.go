@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net"
@@ -56,17 +57,26 @@ func (w *accountWindow) open() {
 	}
 	url := "http://" + w.address + "/#" + w.token
 	if runtime.GOOS == "windows" {
-		edge := filepath.Join(os.Getenv("ProgramFiles(x86)"), "Microsoft", "Edge", "Application", "msedge.exe")
-		if _, err := os.Stat(edge); err == nil {
+		if exe, err := os.Executable(); err == nil {
 			previous := accountWindowHandles()
-			if err := exec.Command(edge, "--app="+url, "--window-size=760,620").Start(); err == nil {
-				go func() { w.finishOpen(resizeAccountWindow(previous)) }()
-				return
+			cmd := exec.Command(exe, "-account-window", url)
+			if input, err := cmd.StdinPipe(); err == nil {
+				if err := cmd.Start(); err == nil {
+					go func() { defer input.Close(); _ = cmd.Wait() }()
+					go func() { w.finishOpen(findAccountWindow(previous)) }()
+					return
+				}
+				_ = input.Close()
 			}
 		}
 	}
 	shellOpen(url)
 	w.finishOpen(0)
+}
+
+func closeWhenParentExits(input io.Reader, closeWindow func()) {
+	_, _ = io.Copy(io.Discard, input)
+	closeWindow()
 }
 
 // beginOpen serializes window creation and reuses the current live window.

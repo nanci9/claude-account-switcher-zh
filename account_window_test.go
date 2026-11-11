@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,25 @@ import (
 	"testing"
 	"time"
 )
+
+func TestAccountWindowClosesWhenParentExits(t *testing.T) {
+	reader, writer := io.Pipe()
+	closed := make(chan struct{})
+	go closeWhenParentExits(reader, func() { close(closed) })
+	select {
+	case <-closed:
+		t.Fatal("window closed while parent was running")
+	default:
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("window did not close after parent exited")
+	}
+}
 
 func TestAccountWindowSecurityAndState(t *testing.T) {
 	s := newSwitcher(t.TempDir())
